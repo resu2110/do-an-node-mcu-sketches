@@ -17,7 +17,7 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#define DHTPIN D1
+#define DHTPIN D5
 #define DHTTYPE DHT22
 
 DHT dht(DHTPIN,DHTTYPE,15);
@@ -30,6 +30,10 @@ const char* out_topic_photon = "outside/light-sensing-front-door";
 const char* out_topic_temperature = "outside/temperature-sensing-front-door";
 const char* out_topic_humidity = "outside/humidity-sensing-front-door";
 const char* clientID = "front-door-node";
+
+float tempCelsius;
+float humidity;
+float msg_photon;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -78,43 +82,44 @@ void reconnect(){
 
 void publish_value(){
   //photon
-  dtostrf(analogRead(A0),2,2,msg);
-  String msg_photon = msg;
+  dtostrf(msg_photon,2,2,msg);
   Serial.print("photon = ");
   Serial.println(msg);
   client.publish(out_topic_photon,msg);
 
 
   //convert F to C
-  dtostrf(dht.readTemperature(DHTPIN),3,3,msg);
-  float tempCelsius = atof(msg);
-  tempCelsius = (tempCelsius - 32)/1.8;
+  tempCelsius = dht.convertFtoC(tempCelsius);
   dtostrf(tempCelsius,3,3,msg);
 
   //temperature
-  String heat = msg;
   client.publish(out_topic_temperature,msg);
-  Serial.println(heat);
+  Serial.println(msg);
 
   //humidity
-  dtostrf(dht.readHumidity(DHTPIN),3,3,msg);
-  String humidity = msg;
+//  dtostrf(dht.readHumidity(DHTPIN),3,3,msg);
+  dtostrf(humidity,3,3,msg);
   client.publish(out_topic_humidity,msg);
-  Serial.println(humidity);
+  Serial.println(msg);
   delay(2000);
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   setup_wifi();
   client.setServer(mqtt_server,1883);
-  pinMode(D1,INPUT);
+  pinMode(D5,INPUT);
 }
-
+ 
 void loop() {
   if(!client.connected()){
     reconnect();
   }
+  msg_photon = analogRead(A0);
+  tempCelsius = dht.readTemperature(DHTPIN);
+  humidity = dht.readHumidity(DHTPIN);
+  
   publish_value();
-  client.loop();
+  
+  delay(1000);
 }

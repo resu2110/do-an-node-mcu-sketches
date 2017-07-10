@@ -9,6 +9,14 @@
    22/6: 
     DHT22: D0
     photon-resistor: A0
+
+   5/7: changing outtopics  from outside/ to room/
+
+   9/7: adding intopics
+        adding toogle-automation
+        D0: lamp
+        D3: mist
+   10/7: remove all control, just sensing
            
 */
 
@@ -26,10 +34,20 @@ const char* ssid = "pi-hi-hi";
 const char* pass = "123456789";
 
 const char* mqtt_server = "172.24.1.1";
-const char* out_topic_photon = "outside/light-sensing-yard";
-const char* out_topic_temperature = "outside/temperature-sensing-yard";
-const char* out_topic_humidity = "outside/humidity-sensing-yard";
-const char* clientID = "yard-node";
+const char* clientID = "corner-node";
+
+const char* out_topic_photon = "room/light-sensing-corner";
+const char* out_topic_temperature = "room/temperature-sensing-corner";
+const char* out_topic_humidity = "room/humidity-sensing-corner";
+
+//const char* in_topic_lamp = "/room/desk-lamp-corner-control";
+//const char* in_topic_mist_generator = "/room/mist-generator-corner-control";
+//
+//const char* in_topic_toggle_automatic = "room/toogle-automatic";
+
+float temperature;
+float humidity;
+float photon;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -55,7 +73,46 @@ void setup_wifi(){
 }
 
 void callback(char* topic, byte* payload, unsigned int length){
-  
+//
+//  String topicName(topic);
+//  
+//  if(topicName == in_topic_toggle_automatic){
+//      String toggle_automation = String((char*)payload);
+//      Serial.print(toggle_automation);
+//      if(toggle_automation = "ONFon"){
+//        client.subscribe(out_topic_photon);
+//        client.subscribe(out_topic_temperature);
+//        client.subscribe(out_topic_humidity);
+//      }else if(toggle_automation = "OFFon"){
+//        client.unsubscribe(out_topic_photon);
+//        client.unsubscribe(out_topic_temperature);
+//        client.unsubscribe(out_topic_humidity);
+//      }
+//  }
+//
+//  if(topicName == out_topic_photon){
+//    photon = atof((char*)payload);
+//    Serial.print("photon value from server:");
+//    Serial.println(photon);
+//    if(photon > 900){
+//      Serial.println("too dark here!");
+//      digitalWrite(D0,LOW);
+//    }else{
+//      digitalWrite(D0,HIGH);
+//    }
+//  }
+//
+//  if(topicName == out_topic_temperature){
+//    temperature = atof((char*)payload);
+//    Serial.print("temperature from server:");
+//    Serial.println(temperature);
+//    if(temperature > 30.0){
+//      Serial.println("too hot at corner");
+//      digitalWrite(D3, LOW);      
+//    }else{
+//      digitalWrite(D3,HIGH);
+//    }
+//  }
 }
 
 void reconnect(){
@@ -63,10 +120,10 @@ void reconnect(){
     Serial.print("Attempting MQTT connection...");
 
     if(client.connect(clientID)){
-      Serial.println("connected to mQTT broker");
-      client.publish(out_topic_photon,clientID);
-//      client.publish(out_topic_temperature,clientID);
-//      client.publish(out_topic_humidity,clientID);
+      Serial.println("connected to MQTT broker");      
+      client.publish(out_topic_photon,clientID);      
+      client.publish(out_topic_temperature,clientID);
+      client.publish(out_topic_humidity,clientID);
     }else{
       Serial.print("failed, rc=...");
       Serial.println(client.state());
@@ -78,38 +135,33 @@ void reconnect(){
 
 void publish_value(){
   //photon
-  dtostrf(analogRead(A0),2,2,msg);
-  String msg_photon = msg;
+  dtostrf(photon,2,2,msg);
+  client.publish(out_topic_photon,msg);
   Serial.print("photon = ");
   Serial.println(msg);
-  client.publish(out_topic_photon,msg);
-
-
+  
   //convert F to C
-  dtostrf(dht.readTemperature(DHTPIN),3,3,msg);
-  float tempCelsius = atof(msg);
-  if(tempCelsius > 0){
-    tempCelsius = (tempCelsius - 32)/1.8;
-    dtostrf(tempCelsius,3,3,msg);
-  
-    //temperature
-    String heat = msg;
-    client.publish(out_topic_temperature,msg);
-    Serial.println(heat);
-  
-    //humidity
-    dtostrf(dht.readHumidity(DHTPIN),3,3,msg);
-    String humidity = msg;
-    client.publish(out_topic_humidity,msg);
-    Serial.println(humidity);
-  }
-  delay(500);
+  temperature = dht.convertFtoC(temperature);
+  dtostrf(temperature,3,3,msg);
+    
+  //temperature
+  client.publish(out_topic_temperature,msg);
+  Serial.println(msg);  
+
+  //humidity
+  dtostrf(humidity,3,3,msg);
+  client.publish(out_topic_humidity,msg);
+  Serial.println(msg);
+
+  delay(3000);
 }
 
 void setup() {
   Serial.begin(115200);
   setup_wifi();
   client.setServer(mqtt_server,1883);
+  client.setCallback(callback);
+  
   pinMode(D5,INPUT);
 }
 
@@ -117,6 +169,12 @@ void loop() {
   if(!client.connected()){
     reconnect();
   }
+
+  temperature = dht.readTemperature(DHTPIN);
+  humidity = dht.readHumidity(DHTPIN);
+  photon = analogRead(A0);
+  
   publish_value();
-  client.loop();
+  delay(2000);  
+//  client.loop();
 }

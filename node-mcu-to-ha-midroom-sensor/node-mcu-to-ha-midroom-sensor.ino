@@ -14,6 +14,8 @@
 
     29-6: gonna add  intopics:
 
+    
+
 */
 
 #include <DHT.h>
@@ -34,6 +36,10 @@ const char* out_topic_photon = "room/light-sensing-mid-room";
 const char* out_topic_temperature = "room/temperature-sensing-mid-room";
 const char* out_topic_humidity = "room/humidity-sensing-mid-room";
 const char* clientID = "mid-room-node";
+
+float temperature;
+float humidity;
+float photon;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -82,29 +88,21 @@ void reconnect() {
 void publish_value() {
 
   //publish photon value
-  dtostrf(analogRead(A0), 2, 2, msg);
-  String msg_photon = msg;
-
+  dtostrf(photon, 2, 2, msg);
   Serial.print("Photonresistor:");
   Serial.println(msg);
   client.publish(out_topic_photon, msg);
 
   //convert F to C
-  dtostrf(dht.readTemperature(DHTPIN), 3, 3, msg); //3 - width, 3 - precision
-  //  float tempCelsius = atof(msg);
-  //  tempCelsius = (tempCelsius-32)/1.8;
-  //  dtostrf(tempCelsius,3,3,msg);
-
-  //publish temperature value
-  String heat = msg;
+  temperature = dht.convertFtoC(temperature);
+  dtostrf(temperature,3,3,msg);
   client.publish(out_topic_temperature, msg);
-  Serial.println(heat);
+  Serial.println(msg);
 
   //publish humidity value
-  dtostrf(dht.readHumidity(DHTPIN), 3, 3, msg);
-  String humidity = msg;
+  dtostrf(humidity, 3, 3, msg);
   client.publish(out_topic_humidity, msg);
-  Serial.println(humidity);
+  Serial.println(msg);
   delay(2000);
 }
 
@@ -119,6 +117,12 @@ void loop() {
   if (!client.connected()) {
     reconnect();
   }
+
+  photon = analogRead(A0);
+  temperature = dht.readTemperature(DHTPIN);
+  humidity = dht.readHumidity(DHTPIN);
+  
   publish_value();
-  client.loop();
+  delay(1000);
+//  client.loop();
 }
